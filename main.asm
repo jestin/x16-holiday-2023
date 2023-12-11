@@ -21,17 +21,19 @@ default_irq			= $8000
 zp_vsync_trig		= $30
 
 vram_tileset = $00000
-vram_tilemap = $10000
+vram_tilemap = $02000
+vram_bitmap = $06000
+vram_next = $0f600
 vram_palette = $1fa00
 
 main:
 
 	; set video mode
-	lda #%00010001		; l0 enabled
-	sta veradcvideo
+	lda #%00000001		; l0 enabled
+	jsr set_dcvideo
 
 	; set video scale to 2x
-	lda #128
+	lda #64
 	sta veradchscale
 	sta veradcvscale
 
@@ -74,21 +76,55 @@ main:
 	ldy #>vram_palette
 	jsr LOAD
 
-	lda #(<(vram_tileset >> 9) | (0 << 1) | 0)
+	;lda #(<(vram_tileset >> 9) | (0 << 1) | 0)
+	;							;  height    |  width
+	;sta veral0tilebase
+
+	;; set the tile map base address
+	;lda #<(vram_tilemap >> 9)
+	;sta veral0mapbase
+
+	;; set the l0 tile mode	
+	;lda #%10100010 	; height (2-bits) - 2 (128 tiles)
+	;				; width (2-bits) - 2 (128 tiles
+	;				; T256C - 0
+	;				; bitmap mode - 0
+	;				; color depth (2-bits) - 3 (4bpp)
+	;sta veral0config
+
+	; clear the bitmap
+	ldx #0
+	ldy #150
+	vset vram_bitmap
+
+	lda #$00
+
+@y_loop:
+
+@x_loop:
+
+	sta veradat
+	inx
+	bne @x_loop
+
+	dey
+	bne @y_loop
+
+	lda #(<(vram_bitmap >> 9) | (0 << 1) | 0)
 								;  height    |  width
 	sta veral0tilebase
 
-	; set the tile map base address
-	lda #<(vram_tilemap >> 9)
-	sta veral0mapbase
-
 	; set the l0 tile mode	
-	lda #%10100010 	; height (2-bits) - 2 (128 tiles)
-					; width (2-bits) - 2 (128 tiles
+	lda #%00000110 	; height (2-bits)
+					; width (2-bits)
 					; T256C - 0
-					; bitmap mode - 0
-					; color depth (2-bits) - 3 (4bpp)
+					; bitmap mode - 1
+					; color depth (2-bits) - 2 (4bpp)
 	sta veral0config
+	
+	; set video mode
+	lda #%00010001		; l0 enabled
+	jsr set_dcvideo
 
 	jsr init_irq
 
@@ -153,12 +189,25 @@ check_vsync:
 ;==================================================
 tick:
 
-	inc veral0vscrolllo
-	bne @return
-	inc veral0vscrollhi
-
 @return:
 	rts
 
+;==================================================
+; set_dcvideo
+;==================================================
+set_dcvideo:
+	pha
+
+	stz veractl
+
+	lda veradcvideo
+	and #%00001111
+	sta u0L
+	pla
+	and #%11110000
+	ora u0L
+	sta veradcvideo
+	
+	rts
 
 

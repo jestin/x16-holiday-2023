@@ -27,7 +27,7 @@ PAL.BIN: TILES.BIN
 	cp TILES.BIN.PAL PAL.BIN
 
 MAP.BIN: holiday_map_2023.tmx
-	tmx2vera holiday_map_2023.tmx -l terrain MAP.BIN
+	tmx2vera holiday_map_2023.tmx -c -l terrain MAP.BIN
 
 run: all resources
 	x16emu -prg $(PROG) -run -scale 2 -debug
