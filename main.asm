@@ -17,6 +17,8 @@ end_tilemap_file:
 palette_file: .literal "PAL.BIN"
 end_palette_file:
 
+vram_destination: .res 3
+
 default_irq			= $8000
 zp_vsync_trig		= $30
 
@@ -97,6 +99,7 @@ main:
 	ldy #150
 	vset vram_bitmap
 
+	; initialize each bitmap byte with black/black
 	lda #$00
 
 @y_loop:
@@ -125,6 +128,96 @@ main:
 	; set video mode
 	lda #%00010001		; l0 enabled
 	jsr set_dcvideo
+
+	; set up the affine helper
+
+	lda #%00000100	; DCSEL = 2
+	sta veractl
+
+	lda #(vram_tileset >> 9)
+	and #%11111100
+	ora #%00000000
+	sta verafxtilebase
+
+	lda #(vram_tilemap >> 9)
+	and #%11111100
+	ora #%00000011
+	sta verafxmapbase
+
+	lda #%10000111
+	sta verafxctrl
+	
+	lda #%00000110	; DCSEL = 3
+	sta veractl
+
+	lda #0
+	sta verafxxinclo
+	lda #%0000010
+	sta verafxxinchi
+
+	lda #<(-40<<1)
+	sta verafxyinclo
+	lda #>(-40<<1)
+	and #%01111111
+	sta verafxyinchi
+
+	lda #<vram_bitmap
+	sta vram_destination
+	lda #>vram_bitmap
+	sta vram_destination+1
+	lda#^vram_bitmap
+	sta vram_destination+2
+
+	ldx #0
+
+@draw_next_row:
+	lda #%00000110  ; DCSEL = 3
+	sta veractl
+
+	lda #%00000100
+	ora vram_destination+2
+	sta verahi
+	lda vram_destination+1
+	sta veramid
+	lda vram_destination
+	sta veralo
+
+	lda #%00001001	; DCSEL = 4
+	sta veractl
+
+	lda #0
+	sta verafxxposlo
+	lda #0
+	sta verafxxposhi
+
+	txa				; lazy and simple: use register x as our y position
+	sta verafxyposlo
+	lda #%00000000
+	sta verafxyposhi
+
+	ldy #0
+@draw_next_pixel:
+	lda veradat2
+	sta veradat
+
+	iny
+	bne @draw_next_pixel
+
+	; end of the row, so increment destination address with +320
+	clc
+	lda vram_destination
+	adc #<160
+	sta vram_destination
+	lda vram_destination+1
+	adc #>160
+	sta vram_destination+1
+	lda vram_destination+2
+	adc #0
+	sta vram_destination+2
+
+	inx
+	cpx #240
+	bne @draw_next_row
 
 	jsr init_irq
 
