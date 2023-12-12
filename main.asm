@@ -30,6 +30,14 @@ vram_palette = $1fa00
 
 main:
 
+	lda #$02
+	sta veractl
+
+	lda #159
+	sta veradchstop
+
+	stz veractl
+
 	; set video mode
 	lda #%00000001		; l0 enabled
 	jsr set_dcvideo
@@ -129,8 +137,6 @@ main:
 	lda #%00010001		; l0 enabled
 	jsr set_dcvideo
 
-	; set up the affine helper
-
 	lda #%00000100	; DCSEL = 2
 	sta veractl
 
@@ -160,64 +166,6 @@ main:
 	lda #>(-40<<1)
 	and #%01111111
 	sta verafxyinchi
-
-	lda #<vram_bitmap
-	sta vram_destination
-	lda #>vram_bitmap
-	sta vram_destination+1
-	lda#^vram_bitmap
-	sta vram_destination+2
-
-	ldx #0
-
-@draw_next_row:
-	lda #%00000110  ; DCSEL = 3
-	sta veractl
-
-	lda #%00000100
-	ora vram_destination+2
-	sta verahi
-	lda vram_destination+1
-	sta veramid
-	lda vram_destination
-	sta veralo
-
-	lda #%00001001	; DCSEL = 4
-	sta veractl
-
-	lda #0
-	sta verafxxposlo
-	lda #0
-	sta verafxxposhi
-
-	txa				; lazy and simple: use register x as our y position
-	sta verafxyposlo
-	lda #%00000000
-	sta verafxyposhi
-
-	ldy #0
-@draw_next_pixel:
-	lda veradat2
-	sta veradat
-
-	iny
-	bne @draw_next_pixel
-
-	; end of the row, so increment destination address with +320
-	clc
-	lda vram_destination
-	adc #<160
-	sta vram_destination
-	lda vram_destination+1
-	adc #>160
-	sta vram_destination+1
-	lda vram_destination+2
-	adc #0
-	sta vram_destination+2
-
-	inx
-	cpx #240
-	bne @draw_next_row
 
 	jsr init_irq
 
@@ -281,7 +229,81 @@ check_vsync:
 ; tick
 ;==================================================
 tick:
+	stz veractl		; DCSEL = 0
+	lda #$d
+	sta veradcborder
 
+	; set up the affine helper
+	
+	lda #<vram_bitmap
+	sta vram_destination
+	lda #>vram_bitmap
+	sta vram_destination+1
+	lda#^vram_bitmap
+	sta vram_destination+2
+
+	ldx #0
+
+@draw_next_row:
+	lda #%00000110  ; DCSEL = 3
+	sta veractl
+
+	lda #%00000100
+	ora vram_destination+2
+	sta verahi
+	lda vram_destination+1
+	sta veramid
+	lda vram_destination
+	sta veralo
+
+	lda #%00001001	; DCSEL = 4
+	sta veractl
+
+	lda #0
+	sta verafxxposlo
+	lda #0
+	sta verafxxposhi
+
+	txa				; lazy and simple: use register x as our y position
+	sta verafxyposlo
+	lda #%00000000
+	sta verafxyposhi
+
+	ldy #64
+@draw_next_pixel:
+	lda veradat2
+	sta veradat
+	lda veradat2
+	sta veradat
+	lda veradat2
+	sta veradat
+	lda veradat2
+	sta veradat
+	lda veradat2
+	sta veradat
+
+	dey
+	bne @draw_next_pixel
+
+	; end of the row, so increment destination address with +320
+	clc
+	lda vram_destination
+	adc #<160
+	sta vram_destination
+	lda vram_destination+1
+	adc #>160
+	sta vram_destination+1
+	lda vram_destination+2
+	adc #0
+	sta vram_destination+2
+
+	inx
+	cpx #30
+	bne @draw_next_row
+
+	stz veractl		; DCSEL = 0
+	lda #0
+	sta veradcborder
 @return:
 	rts
 
