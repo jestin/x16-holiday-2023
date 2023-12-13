@@ -1,3 +1,4 @@
+.macpack longbranch
 .segment "STARTUP"
 .segment "INIT"
 .segment "ONCE"
@@ -17,7 +18,8 @@ end_tilemap_file:
 palette_file: .literal "PAL.BIN"
 end_palette_file:
 
-vram_destination: .res 3
+vram_destination:	.res 3
+source_y:			.res 2
 
 default_irq			= $8000
 zp_vsync_trig		= $30
@@ -25,6 +27,7 @@ zp_vsync_trig		= $30
 vram_tileset = $00000
 vram_tilemap = $02000
 vram_bitmap = $06000
+vram_bitmap_horizon = $0ab00
 vram_next = $0f600
 vram_palette = $1fa00
 
@@ -150,7 +153,7 @@ main:
 	ora #%00000011
 	sta verafxmapbase
 
-	lda #%10000111
+	lda #%11100111
 	sta verafxctrl
 	
 	lda #%00000110	; DCSEL = 3
@@ -166,6 +169,10 @@ main:
 	lda #>(-40<<1)
 	and #%01111111
 	sta verafxyinchi
+
+	; scroll variable initilization
+	stz source_y
+	stz source_y+1
 
 	jsr init_irq
 
@@ -235,20 +242,14 @@ tick:
 
 	; set up the affine helper
 	
-	lda #<vram_bitmap
+	lda #<vram_bitmap_horizon
 	sta vram_destination
-	lda #>vram_bitmap
+	lda #>vram_bitmap_horizon
 	sta vram_destination+1
-	lda#^vram_bitmap
+	lda#^vram_bitmap_horizon
 	sta vram_destination+2
 
-	ldx #0
-
-@draw_next_row:
-	lda #%00000110  ; DCSEL = 3
-	sta veractl
-
-	lda #%00000100
+	lda #%00110000
 	ora vram_destination+2
 	sta verahi
 	lda vram_destination+1
@@ -256,50 +257,44 @@ tick:
 	lda vram_destination
 	sta veralo
 
+	ldx #0
+
+@draw_next_row:
 	lda #%00001001	; DCSEL = 4
 	sta veractl
 
-	lda #0
-	sta verafxxposlo
-	lda #0
-	sta verafxxposhi
+	stz verafxxposlo
+	stz verafxxposhi
 
 	txa				; lazy and simple: use register x as our y position
+	clc
+	adc source_y
 	sta verafxyposlo
-	lda #%00000000
+	lda source_y+1
+	adc #0
+	and #$03
 	sta verafxyposhi
 
-	ldy #64
+	ldy #10
 @draw_next_pixel:
+.repeat 4
+.repeat 8
 	lda veradat2
-	sta veradat
-	lda veradat2
-	sta veradat
-	lda veradat2
-	sta veradat
-	lda veradat2
-	sta veradat
-	lda veradat2
-	sta veradat
+.endrepeat
+	stz veradat
+.endrepeat
 
 	dey
 	bne @draw_next_pixel
 
-	; end of the row, so increment destination address with +320
-	clc
-	lda vram_destination
-	adc #<160
-	sta vram_destination
-	lda vram_destination+1
-	adc #>160
-	sta vram_destination+1
-	lda vram_destination+2
-	adc #0
-	sta vram_destination+2
-
 	inx
-	cpx #30
-	bne @draw_next_row
+	cpx #120
+	jne @draw_next_row
+
+	inc source_y
+	bne :+
+	inc source_y+1
+:
 
 	stz veractl		; DCSEL = 0
 	lda #0
