@@ -19,6 +19,7 @@ palette_file: .literal "PAL.BIN"
 end_palette_file:
 
 vram_destination:	.res 3
+buf_num:			.res 1
 source_y:			.res 2
 
 default_irq			= $8000
@@ -26,9 +27,12 @@ zp_vsync_trig		= $30
 
 vram_tileset = $00000
 vram_tilemap = $02000
-vram_bitmap = $06000
-vram_bitmap_horizon = $0ab00
-vram_next = $0f600
+horizon_index = $4b00
+vram_buffer0 = $06000
+vram_buffer0_horizon = vram_buffer0 + horizon_index
+vram_buffer1 = $10000
+vram_buffer1_horizon = vram_buffer1 + horizon_index
+vram_next = $18c00
 vram_palette = $1fa00
 
 main:
@@ -89,44 +93,10 @@ main:
 	ldy #>vram_palette
 	jsr LOAD
 
-	;lda #(<(vram_tileset >> 9) | (0 << 1) | 0)
-	;							;  height    |  width
-	;sta veral0tilebase
-
-	;; set the tile map base address
-	;lda #<(vram_tilemap >> 9)
-	;sta veral0mapbase
-
-	;; set the l0 tile mode	
-	;lda #%10100010 	; height (2-bits) - 2 (128 tiles)
-	;				; width (2-bits) - 2 (128 tiles
-	;				; T256C - 0
-	;				; bitmap mode - 0
-	;				; color depth (2-bits) - 3 (4bpp)
-	;sta veral0config
-
-	; clear the bitmap
-	ldx #0
-	ldy #150
-	vset vram_bitmap
-
-	; initialize each bitmap byte with black/black
-	lda #$00
-
-@y_loop:
-
-@x_loop:
-
-	sta veradat
-	inx
-	bne @x_loop
-
-	dey
-	bne @y_loop
-
-	lda #(<(vram_bitmap >> 9) | (0 << 1) | 0)
-								;  height    |  width
-	sta veral0tilebase
+	vset vram_buffer0
+	jsr clear_buffer
+	vset vram_buffer1
+	jsr clear_buffer
 
 	; set the l0 tile mode	
 	lda #%00000110 	; height (2-bits)
@@ -135,6 +105,8 @@ main:
 					; bitmap mode - 1
 					; color depth (2-bits) - 2 (4bpp)
 	sta veral0config
+
+	stz buf_num
 	
 	; set video mode
 	lda #%00010001		; l0 enabled
@@ -170,6 +142,29 @@ mainloop:
 	jsr check_vsync
 	jmp mainloop  ; loop forever
 
+	rts
+
+;==================================================
+; clear_buffer
+;==================================================
+clear_buffer:
+	lda #00	; clear colors
+
+	ldx #0
+	ldy #150
+
+@y_loop:
+
+@x_loop:
+
+	; writing twice doubles effectively initializes both buffers
+	sta veradat
+
+	inx
+	bne @x_loop
+
+	dey
+	bne @y_loop
 	rts
 
 ;==================================================
@@ -226,15 +221,41 @@ tick:
 	lda #$d
 	sta veradcborder
 
-	; set up the affine helper
-	
-	lda #<vram_bitmap_horizon
+	lda buf_num
+	bne @buffer1
+
+@buffer0:
+	; display buffer1
+	lda #(<(vram_buffer1 >> 9) | (0 << 1) | 0)
+	sta veral0tilebase
+
+	; draw to buffer0
+	lda #<vram_buffer0_horizon
 	sta vram_destination
-	lda #>vram_bitmap_horizon
+	lda #>vram_buffer0_horizon
 	sta vram_destination+1
-	lda#^vram_bitmap_horizon
+	lda#^vram_buffer0_horizon
 	sta vram_destination+2
 
+	inc buf_num
+	bra @destination_setup
+
+@buffer1:
+	; display buffer0
+	lda #(<(vram_buffer0 >> 9) | (0 << 1) | 0)
+	sta veral0tilebase
+
+	; draw to buffer1
+	lda #<vram_buffer1_horizon
+	sta vram_destination
+	lda #>vram_buffer1_horizon
+	sta vram_destination+1
+	lda#^vram_buffer1_horizon
+	sta vram_destination+2
+
+	stz buf_num
+
+@destination_setup:
 	lda #%00110000
 	ora vram_destination+2
 	sta verahi
@@ -243,6 +264,8 @@ tick:
 	lda vram_destination
 	sta veralo
 
+	; set up the affine helper
+	
 	lda #%00000110	; DCSEL = 3
 	sta veractl
 

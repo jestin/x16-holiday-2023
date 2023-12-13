@@ -32,6 +32,9 @@ MAP.BIN: holiday_map_2023.tmx
 run: all resources
 	x16emu -prg $(PROG) -run -scale 2 -debug
 
+box16:
+	box16 -prg $(PROG) -run -scale 2
+
 clean:
 	rm -f $(PROG) $(LIST)
 
