@@ -156,20 +156,6 @@ main:
 	lda #%11100111
 	sta verafxctrl
 	
-	lda #%00000110	; DCSEL = 3
-	sta veractl
-
-	lda #0
-	sta verafxxinclo
-	lda #%0000010
-	sta verafxxinchi
-
-	lda #<(-40<<1)
-	sta verafxyinclo
-	lda #>(-40<<1)
-	and #%01111111
-	sta verafxyinchi
-
 	; scroll variable initilization
 	stz source_y
 	stz source_y+1
@@ -257,6 +243,20 @@ tick:
 	lda vram_destination
 	sta veralo
 
+	lda #%00000110	; DCSEL = 3
+	sta veractl
+
+	lda #0
+	sta verafxxinclo
+	lda #%0000010
+	sta verafxxinchi
+
+	lda #0
+	sta verafxyinclo
+	lda #0
+	and #%01111111
+	sta verafxyinchi
+
 	ldx #0
 
 @draw_next_row:
@@ -272,7 +272,7 @@ tick:
 	sta verafxyposlo
 	lda source_y+1
 	adc #0
-	and #$03
+	and #%00000011
 	sta verafxyposhi
 
 	ldy #10
@@ -283,14 +283,18 @@ tick:
 .endrepeat
 	stz veradat
 .endrepeat
-
 	dey
 	bne @draw_next_pixel
+
+	; set the row's scale
+	lda #%00000111	; DCSEL = 3
+	sta veractl
 
 	inx
 	cpx #120
 	jne @draw_next_row
 
+	; scroll the image
 	inc source_y
 	bne :+
 	inc source_y+1
