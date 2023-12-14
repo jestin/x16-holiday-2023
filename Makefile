@@ -13,12 +13,15 @@ RESOURCES = TILES.BIN \
 			PAL.BIN \
 			MAP.BIN
 
-all: $(PROG)
+all: bin/$(PROG)
 
-resources: $(RESOURCES)
+resources: $(RESOURCES) bin
+	cp *.BIN bin 2> /dev/null
+	# cp *.ZSM bin 2> /dev/null
+	cp AUTOBOOT.X16 bin 2> /dev/null
 
-$(PROG): $(SOURCES)
-	$(ASSEMBLER6502) $(ASFLAGS) -o $(PROG) $(MAIN)
+bin/$(PROG): $(SOURCES) bin
+	$(ASSEMBLER6502) $(ASFLAGS) -o bin/$(PROG) $(MAIN)
 
 TILES.BIN: Tiles.xcf
 	gimp -i -d -f -b '(export-vera "Tiles.xcf" "TILES.BIN" 0 0 4 8 8 0 1 1)' -b '(gimp-quit 0)'
@@ -30,15 +33,19 @@ MAP.BIN: holiday_map_2023.tmx
 	tmx2vera holiday_map_2023.tmx -c -l terrain MAP.BIN
 
 run: all resources
-	x16emu -prg $(PROG) -run -scale 2 -debug
+	(cd bin; x16emu -prg $(PROG) -run -scale 2 -debug)
 
 box16:
-	box16 -prg $(PROG) -run -scale 2
+	(cd bin; box16 -prg $(PROG) -run -scale 2)
 
 clean:
-	rm -f $(PROG) $(LIST)
+	rm -f bin/$(PROG) $(LIST)
 
 clean_resources:
-	rm -f $(RESOURCES)
+	rm -f $(RESOURCES) *.BIN.PAL
 
 cleanall: clean clean_resources
+	rm -rf bin
+
+bin:
+	mkdir ./bin
