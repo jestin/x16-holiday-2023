@@ -337,10 +337,11 @@ tick:
 	jne @draw_next_row
 
 	; scroll the image
-	inc source_y
+	lda source_y
 	bne :+
-	inc source_y+1
+	dec source_y+1
 :
+	dec source_y
 
 	stz veractl		; DCSEL = 0
 	lda #0
