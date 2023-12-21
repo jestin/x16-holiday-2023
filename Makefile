@@ -7,7 +7,8 @@ LIST = $(NAME).list
 MAIN = main.asm
 SOURCES = $(MAIN) \
 		  x16.inc \
-		  vera.inc
+		  vera.inc \
+		  table.inc
 
 RESOURCES = TILES.BIN \
 			PAL.BIN \
@@ -31,6 +32,9 @@ PAL.BIN: TILES.BIN
 
 MAP.BIN: holiday_map_2023.tmx
 	tmx2vera holiday_map_2023.tmx -c -l terrain MAP.BIN
+
+table.inc: create_table.py
+	python3 create_table.py > table.inc
 
 run: all resources
 	(cd bin; x16emu -prg $(PROG) -run -scale 2 -debug)

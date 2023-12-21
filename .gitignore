@@ -1,3 +1,6 @@
+# generated source files
+table.inc
+
 # assembled binaries
 /bin
 *.prg
